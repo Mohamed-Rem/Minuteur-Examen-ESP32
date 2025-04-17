@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Lien vers Bootstrap -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Lien vers Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <title>Minuterie d'Examen</title>
+
+    <!-- Styles CSS -->
+    <style>
+
+        .container {
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .main {
+            width: 60vw;
+            border-radius: 6px;
+        }
+
+        .header h1 {
+            border-radius: 6px;
+            padding: 20px 40px;
+            text-transform: capitalize;
+            background-color: #111;
+            color: #fff;
+            text-align: center;
+        }
+
+        .body .time {
+            padding: 10px 40px;
+            font-size: 50px;
+            text-align: center;
+            font-weight: 700;
+            margin: 30px 0px;
+        }
+
+        .body .time #seconds {
+            margin-left: 15px;
+            text-align: center;
+            font-size: 18px;
+            vertical-align: middle;
+            margin-bottom: 0rem;
+            color: #444;
+        }
+
+        .body .setTime,
+        .body .setAlert {
+            padding: 0px 40px 30px;
+            text-align: center;
+        }
+
+        .body .setTime label,
+        .body .setAlert label {
+            font-size: 15px;
+            vertical-align: middle;
+            font-weight: 500;
+        }
+
+        .body .setTime input,
+        .body .setAlert input {
+            text-align: center;
+            vertical-align: middle;
+            margin-right: 3rem;
+        }
+
+        .body .setTime button,
+        .body .setAlert button {
+            padding: 4px 12px;
+        }
+
+        .body .alerts {
+            padding: 0px 20px;
+            margin-bottom: 20px;
+        }
+
+        .editBtns {
+            text-align: center;
+            padding: 0px 40px 30px;
+        }
+
+        .lock {
+            display: block;
+            padding: 10px;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        #lock {
+            cursor: pointer;
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <div class="container">
+        
+        <div class="main card">
+            <div class="header">
+                <h1>minuterie examen</h1>
+            </div>
+
+            <div class="body">
+                <div class="time">
+                    <p id='timer'>0 minutes</p>
+                    <p id='seconds'>0 seconds</p>
+                </div>
+
+                <div class="setTime">
+                    <label for="minuteInput">Temps (en minutes) :</label>
+                    <input type="number" id="minuteInput" name="minutes" min="1" max="60" value="5">
+                    <button class="btn btn-dark" onclick="setTime()">Définir le temps</button>
+                </div>
+
+                <div class="setAlert">
+                    <label for="alertInput">Alerts (en minutes) :</label>
+                    <input type="number" id="alertInput" name="alert" min="1" max="60" value="0">
+                    <button class="btn btn-dark" onclick="setalert()">Définir le temps</button>
+                </div>
+
+                <div class="alerts">
+                    <ul class="list-group" id="alerts_list"></ul>
+                </div>
+
+                <div class="editBtns">
+                    <button class="btn btn-success" onclick="setStates('start')">Démarrer</button>
+                    <button class="btn btn-warning" onclick="setStates('stop')">Arrêter</button>
+                    <button class="btn btn-danger" onclick="setStates('reset')">Réinitialiser</button>
+                </div>
+                <p class="lock"> System State : <i id="lock" class="fa fa-unlock-alt" aria-hidden="true"></i> </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+        //======================= Variables globales =========================
+        
+        let remainingMinutes = 0;   // Stocke les minutes restantes
+        let remainingSeconds = 0;   // Stocke les secondes restantes
+        let syncInterval = null;    // Stocke l'intervalle pour la synchronisation avec le serveur
+        let localInterval = null;   // Stocke l'intervalle pour la mise à jour locale du minuteur
+
+        // =====================================================================
+        
+        // Synchronise les données avec le serveur (ESP32)
+        function syncWithServer() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    // Met à jour les variables globales avec les données reçues
+                    remainingMinutes = data.minutes;
+                    remainingSeconds = data.seconds;
+                    console.log("Synchronisé avec le serveur : " + remainingMinutes + "m " + remainingSeconds + "s");
+
+                    // Met à jour l'affichage HTML
+                    document.getElementById('timer').innerText = remainingMinutes + ' minutes';
+                    document.getElementById('seconds').innerText = remainingSeconds + ' seconds';
+                });
+        }
+
+        // Met à jour le minuteur localement chaque seconde
+        function updateLocalTimer() {
+
+            if (remainingSeconds === 0) {
+                // Si les secondes atteignent 0
+                if (remainingMinutes > 0) {
+                    // S'il reste des minutes, décrémente les minutes et réinitialise les secondes à 59
+                    remainingMinutes--;
+                    remainingSeconds = 59;
+                }
+            } else {
+                // Sinon, décrémente simplement les secondes
+                remainingSeconds--;
+            }
+
+            // Met à jour l'affichage HTML
+            document.getElementById('timer').innerText = remainingMinutes + ' minutes';
+            document.getElementById('seconds').innerText = remainingSeconds + ' seconds';
+        }
+
+        // Démarre les minuteurs (synchronisation et local)
+        function startTimers() {
+            if (!syncInterval) {
+                // Si l'intervalle de synchronisation n'est pas actif
+                syncWithServer(); // Synchronisation immédiate
+                syncInterval = setInterval(syncWithServer, 60000); // Synchronisation toutes les 60 secondes
+            }
+
+            if (!localInterval) {
+                // Si l'intervalle local n'est pas actif
+                localInterval = setInterval(updateLocalTimer, 1000); // Mise à jour chaque seconde
+            }
+        }
+
+        function stopTimers() {
+            // Arrête les deux minuteurs
+            clearInterval(syncInterval);
+            clearInterval(localInterval);
+            
+            // Réinitialise les références des intervalles
+            syncInterval = null;
+            localInterval = null;
+        }
+
+        // Gère les états du minuteur (start, stop, reset)
+        function setStates(state) {
+            
+            // Affiche l'état dans la console
+            console.log(state);
+
+            // Envoie une requête au serveur pour l'état correspondant (ex. /start, /stop, /reset)
+            fetch('/' + state);
+
+            if (state === 'start') {
+                // Si l'état est "start", démarre les minuteurs
+                startTimers();
+            } else if (state === 'stop') {
+                // Si l'état est "stop", arrête les minuteurs
+                stopTimers();
+            } else if (state === 'reset') {
+                // Si l'état est "reset", Arrête les minuteurs
+                stopTimers();
+                
+                // Réinitialise les minutes et secondes à 0
+                remainingMinutes = 0;
+                remainingSeconds = 0;
+                
+                // Met à jour l'affichage
+                document.getElementById('timer').innerText = '0 minutes';
+                document.getElementById('seconds').innerText = '0 seconds';
+                
+                // Vide la liste des alertes
+                document.getElementById('alerts_list').innerHTML = '';
+            }
+        }
+
+        // Envoie la durée de la minuterie au serveur
+        function setTime() {
+            
+            var minutes = document.getElementById('minuteInput').value;
+            
+            // Récupère la valeur saisie dans le champ des minutes
+            fetch('/settime?minutes=' + minutes)
+                .then(response => response.json())
+                .then(data => {
+                    // Met à jour l'affichage avec les minutes reçues du serveur
+                    document.getElementById('timer').innerText = data.minutes + ' minutes';
+                    // Affiche la confirmation dans la console
+                    console.log("Time set to: " + data.minutes + " minutes");
+                });
+        }
+
+        // Configure une alerte à un certain temps avant la fin
+        function setalert() {
+            // Récupère la valeur saisie dans le champ des alertes
+            var alerts = document.getElementById('alertInput').value;
+            
+            fetch('/settime?alerts=' + alerts)
+                .then(response => response.json())
+                .then(data => {
+                    // Affiche la confirmation dans la console
+                    console.log("Alert set to: " + data.alerts + " alerts");
+                    // Ajoute une entrée à la liste des alertes
+                    document.getElementById('alerts_list').insertAdjacentHTML('beforeend', '<li class="list-group-item list-group-item-info">- Une alerte est programmée ' + data.alerts + ' minutes avant la fin.</li>');
+                });
+        }
+
+        
+        // Référence à l'icône de verrouillage
+        const icon = document.getElementById("lock");
+        
+        // Sélectionne tous les boutons de la page
+        const buttons = document.querySelectorAll("button");
+
+        // Ajoute un écouteur d'événements pour le clic sur l'icône de verrouillage
+        icon.addEventListener("click", () => {
+            
+            // Si l'icône est verrouillé
+            if (icon.classList.contains("fa-lock")) {
+                // Passe à l'état déverrouillé
+                icon.classList.remove("fa-lock");
+                icon.classList.add("fa-unlock-alt");
+                buttons.forEach(btn => {
+                    // Active tous les boutons
+                    btn.disabled = false;
+                });
+            } else {
+                // Si l'icône est déverrouillée
+                icon.classList.remove("fa-unlock-alt");
+                icon.classList.add("fa-lock");
+                // Passe à l'état verrouillé
+                buttons.forEach(btn => {
+                    // Désactive tous les boutons
+                    btn.disabled = true;
+                });
+            }
+        });
+    </script>
+</html>
