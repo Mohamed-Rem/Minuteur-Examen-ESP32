@@ -50,6 +50,6 @@ Fonctionnalités :
 
 ## ✨ Exemple
 
-![image](https://github.com/user-attachments/assets/df526762-3c5d-49b9-bb0f-acbd5889cae3)
+![image](https://github.com/user-attachments/assets/0b7c3e64-5f65-415c-91f6-a483d83cc4ff)
 
 
