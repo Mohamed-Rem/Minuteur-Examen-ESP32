@@ -53,6 +53,3 @@ Fonctionnalités :
 ![image](https://github.com/user-attachments/assets/df526762-3c5d-49b9-bb0f-acbd5889cae3)
 
 
-## 👨‍💻 Développé par
-**Amine Remmas**  
-
